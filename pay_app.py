@@ -1,11 +1,11 @@
 from fastapi.exceptions import RequestValidationError
 from fastapi import FastAPI, Request, Response
-from pydantic import BaseModel
 from typing import Dict, List
 from math import floor
 import dateutil.parser
 import requests
 import datetime
+import schems
 
 app = FastAPI()
 
@@ -25,7 +25,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # checks if date is valid (with timezone)
 # input: date as string
 # returns: bool if is valid
-def validate_iso(sval):
+def validate_iso(sval: str):
     try:
         valid_datetime = dateutil.parser.parse(sval)
         return True
@@ -38,7 +38,7 @@ def validate_iso(sval):
 #       CustomerPaymentMethodResp
 #       date as string
 # returns: -
-def add_to_database(customer_number, payment_customer_method, date):
+def add_to_database(customer_number: int, payment_customer_method: dict, date: str):
     valid_datetime = datetime.datetime.strptime(date, "%Y-%m-%dT%H:%M:%S%z")
     if customer_number in app.database:
         if valid_datetime > app.database[customer_number][0]:
@@ -50,7 +50,7 @@ def add_to_database(customer_number, payment_customer_method, date):
 # exchanges money
 # input: currency_exchange as string
 # returns: response from NBP
-def exchange(currency_exchange):
+def exchange(currency_exchange: str):
     path_nbp = "http://api.nbp.pl/api/exchangerates/rates/a/"
     if currency_exchange.lower() == "pln":
         response = 1
@@ -64,7 +64,7 @@ def exchange(currency_exchange):
 # masks card number
 # input: card number as string
 # returns: masked card number as string
-def masked_card_number(card_number):
+def masked_card_number(card_number: str):
     if len(card_number) == 16:
         new_card_number = card_number[0:4] + "*" * 8 + card_number[12:16]
         return new_card_number
@@ -75,7 +75,7 @@ def masked_card_number(card_number):
 #       parameters from request as JSON
 # returns: payment mean as string
 # throws KeyError when we have unknown payment method - we will catch it in request processing and return 400 response
-def get_payment_mean(payment_method, numbers_dict):
+def get_payment_mean(payment_method: str, numbers_dict: dict):
     if payment_method == "pay_by_link":
         return numbers_dict["bank"]
     elif payment_method == "dp":
@@ -85,41 +85,6 @@ def get_payment_mean(payment_method, numbers_dict):
             numbers_dict["card_number"])
     else:
         raise KeyError
-
-
-class PaymentMethodRq(BaseModel):
-    pay_by_link: List[Dict]
-    dp: List[Dict]
-    card: List[Dict]
-
-
-# Models of responses and requests
-class PaymentMethodResp(BaseModel):
-    date: str
-    type: str
-    payment_mean: str
-    description: str
-    currency: str
-    amount: int
-    amount_in_pln: int
-
-
-class CustomerPaymentMethodRq(BaseModel):
-    customer_id: int
-    pay_by_link: List[Dict]
-    dp: List[Dict]
-    card: List[Dict]
-
-
-class CustomerPaymentMethodResp(BaseModel):
-    customer_id: int
-    date: str
-    type: str
-    payment_mean: str
-    description: str
-    currency: str
-    amount: int
-    amount_in_pln: int
 
 
 # POST methods
